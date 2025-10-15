@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sample Test Site</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;margin:24px;background:#f6f8fb;color:#102a43}button{padding:8px 12px;margin:6px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer}pre{background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0}</style>
+</head>
+<body>
+  <h1>Sample Test Site</h1>
+  <p>This small site exposes a few endpoints you can use as a safe target for local performance tests.</p>
+  <div>
+    <button id="btn-delay">/api/delay?ms=500</button>
+    <button id="btn-cpu">/api/cpu?ms=100</button>
+    <button id="btn-stream">/api/stream?chunks=5&delay=200</button>
+    <button id="btn-error">/api/error</button>
+  </div>
+  <h3>Response</h3>
+  <pre id="out">Ready.</pre>
+
+  <script>
+    const out = document.getElementById('out');
+    function log(s){ out.textContent = (new Date()).toISOString() + ' - ' + s + '\n' + out.textContent; }
+    async function call(path){ try{ const r = await fetch(path); const text = await r.text(); log(path + ' -> ' + r.status + '\n' + text); } catch(e){ log(path + ' -> ERROR ' + e.message); } }
+    document.getElementById('btn-delay').addEventListener('click', ()=>call('/api/delay?ms=500'));
+    document.getElementById('btn-cpu').addEventListener('click', ()=>call('/api/cpu?ms=100'));
+    document.getElementById('btn-stream').addEventListener('click', ()=>call('/api/stream?chunks=5&delay=200'));
+    document.getElementById('btn-error').addEventListener('click', ()=>call('/api/error'));
+  </script>
+</body>
+</html>
