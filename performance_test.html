@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perf Test Target — Runner</title>
+  <style>
+    :root{--bg:#0f1720;--card:#0b1220;--muted:#94a3b8;--accent:#06b6d4;--success:#16a34a}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;color:#e6eef6;background:linear-gradient(180deg,#071029 0%, #071a2a 60%);}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px;display:grid;grid-template-columns:1fr 420px;gap:20px}
+    .panel{background:rgba(255,255,255,0.03);border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(2,6,23,0.6);}
+    h1{margin:0 0 8px;font-size:20px}
+    p.lead{color:var(--muted);margin:0 0 12px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{background:#062532;border:1px solid rgba(255,255,255,0.04);color:var(--accent);padding:8px 12px;border-radius:8px;cursor:pointer}
+    .form-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    label{color:var(--muted);font-size:13px}
+    input[type=text],input[type=url],input[type=number],select{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:#dbeafe}
+    .muted{color:var(--muted);font-size:13px}
+    .status{display:flex;gap:12px;align-items:center}
+    .chip{background:rgba(255,255,255,0.03);padding:8px 10px;border-radius:8px;font-size:13px}
+    .meter{height:10px;background:rgba(255,255,255,0.04);border-radius:999px;overflow:hidden}
+    .meter > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7dd3fc);width:0%}
+    table{width:100%;border-collapse:collapse;margin-top:12px}
+    td,th{padding:8px 6px;text-align:left;color:#cfe8ff}
+    th{color:var(--muted);font-weight:600;font-size:13px}
+    .right{color:#9fb4d9}
+    pre.log{background:rgba(0,0,0,0.25);padding:10px;border-radius:8px;color:#e6eef6;max-height:220px;overflow:auto}
+    @media (max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}}
+  /* modal */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.6);display:none;align-items:center;justify-content:center;z-index:60}
+  .modal{background:#071226;color:#e6eef6;border-radius:10px;padding:18px;max-width:520px;width:94%;box-shadow:0 8px 30px rgba(2,6,23,0.7)}
+  .modal h4{margin:0 0 8px}
+  .modal p{color:var(--muted);margin:0 0 12px}
+  .modal .row{display:flex;gap:8px;justify-content:flex-end}
+  .modal .btn{padding:8px 12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <main class="panel">
+      <h1>Perf Test Target — Content</h1>
+      <p class="lead">This page serves as a target for experiments. Use the runner panel to start tests against this site or any allowed host.</p>
+
+      <section style="margin-top:12px">
+        <h3 style="margin:0 0 8px">Interactive endpoint actions</h3>
+        <div class="actions" style="margin-bottom:12px">
+          <button class="btn" id="btn-delay">/delay (500ms)</button>
+          <button class="btn" id="btn-cpu">/cpu (100ms)</button>
+          <button class="btn" id="btn-stream">/stream (5 chunks)</button>
+          <button class="btn" id="btn-error">/error (500)</button>
+          <button class="btn" id="btn-many">20× /delay(200)</button>
+        </div>
+      </section>
+
+      <section style="margin-top:16px">
+        <h3 style="margin:0 0 8px">Console</h3>
+        <pre id="console" class="log">Ready.</pre>
+      </section>
+        <hr>
+        <h3>History</h3>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <button id="refreshHistoryBtn">Refresh</button>
+          <button id="downloadHistoryBtn">Download</button>
+          <button id="seedHistoryBtn">Seed (admin)</button>
+          <button id="cleanupHistoryBtn">Cleanup (admin)</button>
+          <input id="historyLimit" type="number" min="1" max="1000" value="50" style="width:80px"/>
+          <span id="historyStatus" style="font-size:12px;color:#666"></span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <label style="font-size:12px;color:#666"><input id="tailToggle" type="checkbox"> Live tail</label>
+        </div>
+        <div id="historyList" style="max-height:220px;overflow:auto;background:#fff;border:1px solid #ddd;padding:8px;border-radius:6px"></div>
+    </main>
+
+    <aside class="panel">
+      <h2 style="margin:0 0 10px">Test Runner</h2>
+      <form id="run-test-form">
+        <div class="form-row"><label style="width:100px">Target URL</label><input id="targetUrl" type="url" value="http://localhost:3001/delay?ms=200" style="flex:1"></div>
+        <div class="form-row"><label style="width:100px">VUs</label><input id="vusInput" type="number" value="5" min="1" style="width:120px"></div>
+        <div class="form-row"><label style="width:100px">Duration (s)</label><input id="durationInput" type="number" value="15" min="1" style="width:120px"></div>
+        <div class="form-row"><label style="width:100px">Engine</label><select id="engineSelect" style="width:180px"><option value="jmeter">jmeter</option><option value="demo" id="demoOption">demo (disabled)</option></select></div>
+        <div style="display:flex;gap:8px;margin-top:8px"><button class="btn" id="btn-start-test" type="submit">Start Test</button><button class="btn" id="btn-abort" type="button">Abort</button></div>
+      </form>
+
+      <div style="margin-top:12px">
+        <div class="status">
+          <div class="chip" id="statusChip">idle</div>
+          <div class="chip" id="testIdChip">—</div>
+          <div class="chip" id="controlPortChip">control: ?</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="muted">Progress</div>
+          <div class="meter" aria-hidden><i id="progressBar"></i></div>
+        </div>
+
+        <table>
+          <tr><th>Metric</th><th class="right">Value</th></tr>
+          <tr><td>Total requests</td><td id="m-total" class="right">-</td></tr>
+          <tr><td>Success</td><td id="m-success" class="right">-</td></tr>
+          <tr><td>Errors</td><td id="m-errors" class="right">-</td></tr>
+          <tr><td>Avg latency (ms)</td><td id="m-avg" class="right">-</td></tr>
+          <tr><td>P95 (ms)</td><td id="m-p95" class="right">-</td></tr>
+          <tr><td>P99 (ms)</td><td id="m-p99" class="right">-</td></tr>
+        </table>
+
+        <div style="margin-top:10px"><a id="artifactLink" href="#" style="color:var(--accent);display:none">Download results</a></div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // control API is on port+1
+    const controlBase = (location.protocol + '//' + location.hostname + ':' + (location.port ? (parseInt(location.port,10)+1) : '3001'));
+    const consoleEl = document.getElementById('console');
+    function log(msg){ consoleEl.textContent = (new Date()).toISOString() + ' — ' + msg + '\n' + consoleEl.textContent; }
+
+    function setStatus(text, color){ const chip = document.getElementById('statusChip'); chip.textContent = text; }
+    function updateMetrics(data){ document.getElementById('m-total').textContent = data.total ?? '-'; document.getElementById('m-success').textContent = data.success ?? '-'; document.getElementById('m-errors').textContent = data.errors ?? '-'; document.getElementById('m-avg').textContent = data.avgLatencyMs ?? '-'; document.getElementById('m-p95').textContent = data.p95 ?? '-'; document.getElementById('m-p99').textContent = data.p99 ?? '-'; }
+    function setProgress(pct){ document.getElementById('progressBar').style.width = Math.max(0, Math.min(100, pct)) + '%'; }
+
+    let pollHandle = null;
+
+    // Client-side validation
+    function validateInputs(target, vus, duration) {
+      try {
+        const u = new URL(target);
+        if (!['http:', 'https:'].includes(u.protocol)) return 'URL must use http or https';
+      } catch (e) {
+        return 'Invalid URL';
+      }
+
+      // History UI
+      async function fetchHistory() {
+        const limit = Number(document.getElementById('historyLimit').value || 50);
+        const status = document.getElementById('historyStatus');
+        status.textContent = 'loading...';
+        try {
+          const res = await fetch(controlBase + '/history?limit=' + encodeURIComponent(limit));
+          if (!res.ok) throw new Error('status ' + res.status);
+          const data = await res.json();
+      renderHistoryCards(data);
+          status.textContent = `showing ${data.length}`;
+        } catch (e) {
+          status.textContent = 'error: ' + e.message;
+        }
+      }
+
+      async function cleanupHistory() {
+        const limit = Number(document.getElementById('historyLimit').value || 1000);
+        const status = document.getElementById('historyStatus');
+        status.textContent = 'running cleanup...';
+        try {
+          const res = await fetch(controlBase + '/admin/cleanup-history', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ maxEntries: limit }) });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+          status.textContent = `kept ${data.kept}`;
+          fetchHistory();
+        } catch (e) {
+          status.textContent = 'error: ' + e.message;
+        }
+
+        // Render history as cards
+        function renderHistoryCards(items) {
+          const list = document.getElementById('historyList');
+          list.innerHTML = '';
+          if (!items || items.length === 0) { list.textContent = 'No history yet.'; return; }
+          items.slice().reverse().forEach(it => {
+            const card = document.createElement('div');
+            card.style.border = '1px solid #eee';
+            card.style.padding = '8px';
+            card.style.marginBottom = '8px';
+            card.style.borderRadius = '6px';
+            const title = document.createElement('div');
+            title.style.fontWeight = '600';
+            title.textContent = `#${it.id} — ${it.status} (${it.total || 0} reqs)`;
+            const meta = document.createElement('div');
+            meta.style.fontSize = '12px';
+            meta.style.color = '#666';
+            meta.textContent = `success ${it.success || 0}  errors ${it.errors || 0}  avg ${it.avgLatencyMs || '-'}ms`;
+            const raw = document.createElement('pre'); raw.style.margin = '6px 0 0'; raw.style.whiteSpace = 'pre-wrap'; raw.style.fontSize='12px'; raw.textContent = JSON.stringify(it);
+            card.appendChild(title); card.appendChild(meta); card.appendChild(raw);
+            list.appendChild(card);
+          });
+        }
+
+        // SSE tailing
+        let tailEventSource = null;
+        document.getElementById('tailToggle').addEventListener('change', (e) => {
+          if (e.target.checked) {
+            if (tailEventSource) tailEventSource.close();
+            tailEventSource = new EventSource(controlBase + '/history/tail');
+            tailEventSource.onmessage = (m) => {
+              try { const obj = JSON.parse(m.data); const current = (window._lastHistory || []); current.push(obj); window._lastHistory = current; renderHistoryCards(current); } catch (e) {}
+            };
+            tailEventSource.onerror = () => { document.getElementById('historyStatus').textContent = 'tail error'; };
+          } else {
+            if (tailEventSource) { tailEventSource.close(); tailEventSource = null; }
+          }
+        });
+
+        // Clear history (admin)
+        async function clearHistory() {
+          const status = document.getElementById('historyStatus');
+          status.textContent = 'clearing...';
+          try {
+            const res = await fetch(controlBase + '/admin/clear-history', { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+            status.textContent = 'cleared';
+            fetchHistory();
+          } catch (e) { status.textContent = 'error: ' + e.message; }
+        }
+
+        // wire Clear button
+        const clearBtn = document.createElement('button'); clearBtn.textContent = 'Clear (admin)'; clearBtn.style.marginLeft='6px';
+        clearBtn.addEventListener('click', clearHistory);
+        document.getElementById('historyStatus').parentNode && document.getElementById('historyStatus').parentNode.insertBefore(clearBtn, document.getElementById('historyStatus'));
+      }
+
+      document.getElementById('refreshHistoryBtn').addEventListener('click', fetchHistory);
+      document.getElementById('downloadHistoryBtn').addEventListener('click', async () => {
+        const url = controlBase + '/history/download';
+        // open in a new tab to trigger download
+        window.open(url, '_blank');
+      });
+      document.getElementById('seedHistoryBtn').addEventListener('click', async () => {
+        const status = document.getElementById('historyStatus');
+        status.textContent = 'seeding...';
+        try {
+          const res = await fetch(controlBase + '/admin/seed-history', { method: 'POST' });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || JSON.stringify(data));
+          status.textContent = `seeded ${data.seeded}`;
+          fetchHistory();
+        } catch (e) {
+          status.textContent = 'error: ' + e.message;
+        }
+      });
+      document.getElementById('cleanupHistoryBtn').addEventListener('click', cleanupHistory);
+
+      // load initial history on start
+      fetchHistory();
+      if (!(Number.isInteger(vus) && vus >= 1 && vus <= 2000)) return 'VUs must be an integer between 1 and 2000';
+      if (!(Number.isInteger(duration) && duration >= 1 && duration <= 86400)) return 'Duration must be between 1 and 86400 seconds';
+      return null;
+    }
+
+    async function startTestFromForm(ev){
+      ev && ev.preventDefault();
+      const target = document.getElementById('targetUrl').value.trim();
+      const vus = parseInt(document.getElementById('vusInput').value,10) || 1;
+      const durationSeconds = parseInt(document.getElementById('durationInput').value,10) || 10;
+      const engine = document.getElementById('engineSelect').value;
+      const vErr = validateInputs(target, vus, durationSeconds);
+      if (vErr) { log('Validation error: ' + vErr); setStatus('invalid-input'); return; }
+      log(`Submitting test ${target} vus=${vus} dur=${durationSeconds} engine=${engine}`);
+      setStatus('submitting');
+      try{
+        const resp = await fetch(controlBase + '/run-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:target,vus,durationSeconds,engine})});
+        const data = await resp.json();
+        if(!resp.ok) throw new Error(JSON.stringify(data));
+        document.getElementById('testIdChip').textContent = 'id: ' + data.testId;
+        setStatus('queued');
+        pollTest(data.testId, durationSeconds);
+        log('Test queued id=' + data.testId);
+      } catch(e) {
+        log('Failed to start test: ' + e.message);
+        setStatus('error');
+      }
+    }
+
+    async function pollTest(id, durationSeconds){ if(pollHandle) clearInterval(pollHandle); const start = Date.now(); setStatus('running'); setProgress(0); pollHandle = setInterval(async ()=>{ try{ const r = await fetch(controlBase + '/test/' + id); const j = await r.json(); log('status ' + id + ' -> ' + JSON.stringify(j)); updateMetrics(j); if(j.status === 'running'){ const elapsed = (Date.now() - (j.startedAt||start))/1000; const pct = Math.min(100, Math.round((elapsed/durationSeconds)*100)); setProgress(pct); } else if(j.status === 'completed' || j.status === 'failed'){ setProgress(100); setStatus(j.status); if(j.artifact) { const a = document.getElementById('artifactLink'); a.href = j.artifact; a.style.display = 'inline'; a.textContent = 'Download results'; } clearInterval(pollHandle); pollHandle = null; } }catch(e){ log('poll error: ' + e.message); clearInterval(pollHandle); pollHandle = null; setStatus('poll-error'); } }, 1500);
+    }
+
+    document.getElementById('run-test-form').addEventListener('submit', startTestFromForm);
+    document.getElementById('btn-start-test').addEventListener('click',(e)=>{});
+    document.getElementById('btn-abort').addEventListener('click', ()=>{ if(pollHandle) { clearInterval(pollHandle); pollHandle=null; setStatus('aborted'); log('Polling aborted'); } });
+
+    async function fetchJson(path){ const start = performance.now(); try{ const res = await fetch(path); const text = await res.text(); const took = Math.round(performance.now() - start); log(`${path} -> ${res.status} (${took}ms)\n${text}`); }catch(err){ const took = Math.round(performance.now() - start); log(`${path} -> ERROR (${took}ms) ${err.message}`); }}
+
+    document.getElementById('btn-delay').addEventListener('click', ()=> fetchJson('/delay?ms=500'));
+    document.getElementById('btn-cpu').addEventListener('click', ()=> fetchJson('/cpu?ms=100'));
+    document.getElementById('btn-stream').addEventListener('click', ()=> fetchJson('/stream?chunks=5&delay=200'));
+    document.getElementById('btn-error').addEventListener('click', ()=> fetchJson('/error'));
+    document.getElementById('btn-many').addEventListener('click', async ()=>{ log('Starting 20 concurrent requests to /delay?ms=200'); const promises = Array.from({length:20}).map(()=> fetch('/delay?ms=200').then(r=>r.status).catch(e=>'err')); const results = await Promise.all(promises); log('Concurrent results: ' + results.join(',')); });
+
+    // On load, check control health (including JMeter presence)
+    (async function initHealth(){
+      try {
+        const r = await fetch(controlBase + '/health');
+        const j = await r.json();
+        log('Control health: ' + JSON.stringify(j));
+        // show control port
+        try { const controlPort = new URL(controlBase).port || (location.port ? (parseInt(location.port,10)+1) : '3001'); document.getElementById('controlPortChip').textContent = 'control: ' + controlPort; } catch(e){}
+        if (j.jmeter && j.jmeter.installed) {
+          const eng = document.getElementById('engineSelect');
+          const opt = eng.querySelector('option[value="jmeter"]');
+          opt.textContent = `jmeter (available ${j.jmeter.version||''})`;
+        } else {
+          const eng = document.getElementById('engineSelect');
+          const opt = eng.querySelector('option[value="jmeter"]');
+          opt.disabled = true;
+          opt.textContent = 'jmeter (not installed)';
+          log('JMeter not found on server. Install JMeter or enable demo mode.');
+        }
+        if (j.demoAllowed) {
+          const demoOpt = document.getElementById('demoOption');
+          demoOpt.disabled = false;
+          demoOpt.textContent = 'demo (local)';
+          // show demo limits in UI
+          const limits = j.demoLimits || { maxVus: 50, maxDuration: 120 };
+          document.getElementById('m-info-demo').textContent = `demo caps: VUs<=${limits.maxVus}, duration<=${limits.maxDuration}s`;
+        } else {
+          const demoOpt = document.getElementById('demoOption');
+          demoOpt.disabled = true;
+          demoOpt.textContent = 'demo (disabled)';
+        }
+      } catch (e) {
+        log('Health check failed: ' + e.message);
+      }
+    })();
+
+    // --- Demo confirmation modal ---
+    function showModal() {
+      const b = document.getElementById('modalBackdrop');
+      b.style.display = 'flex';
+      // animate
+      b.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
+    }
+    function hideModal() {
+      const b = document.getElementById('modalBackdrop');
+      b.style.display = 'none';
+    }
+    // When engine selection changes, require confirmation for demo
+  document.getElementById('engineSelect').addEventListener('change', (e) => {
+      const v = e.target.value;
+      if (v === 'demo') {
+        // if demo option enabled, show modal to confirm
+        const demoOpt = document.getElementById('demoOption');
+        if (demoOpt && !demoOpt.disabled) {
+      // show modal only if user hasn't previously confirmed in this browser
+      const confirmed = localStorage.getItem('demoConfirmed') === 'true';
+      if (!confirmed) showModal();
+          // autofill a safe local target if current target doesn't look local
+          try {
+            const t = document.getElementById('targetUrl');
+            const url = new URL(t.value);
+            if (!['localhost','127.0.0.1','::1'].includes(url.hostname)) {
+              // set safe local default that targets the server's delay endpoint
+              const controlPort = new URL(controlBase).port || (location.port ? (parseInt(location.port,10)+1) : '3001');
+              t.value = `http://localhost:${controlPort}/delay?ms=200`;
+            }
+          } catch (err) {
+            // invalid current target, set safe default
+            const controlPort = new URL(controlBase).port || (location.port ? (parseInt(location.port,10)+1) : '3001');
+            document.getElementById('targetUrl').value = `http://localhost:${controlPort}/delay?ms=200`;
+          }
+        }
+      }
+    });
+
+    // modal buttons
+  document.addEventListener('click', (e) => {
+      if (!e.target) return;
+      if (e.target.id === 'modalCancel') {
+        // revert engine selection to jmeter (or first available)
+        const eng = document.getElementById('engineSelect');
+        eng.value = 'jmeter';
+        hideModal();
+      }
+      if (e.target.id === 'modalConfirm') {
+        // allow demo and close
+    hideModal();
+    localStorage.setItem('demoConfirmed', 'true');
+        // user confirmed; nothing else to do because form will submit normally
+      }
+    });
+
+  </script>
+  <!-- Demo confirmation modal -->
+  <div id="modalBackdrop" class="modal-backdrop">
+    <div class="modal" role="dialog" aria-modal="true">
+      <h4>Run demo load test?</h4>
+      <p>You're about to run a local demo load test using the in-process runner. This is intended for small, local experiments only and may block your machine briefly. Continue?</p>
+      <div class="row">
+        <button id="modalCancel" class="btn">Cancel</button>
+        <button id="modalConfirm" class="btn">Confirm</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

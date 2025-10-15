@@ -1,0 +1,7 @@
+{"id":"1","status":"completed","total":100,"success":100,"errors":0,"avgLatencyMs":50,"p95":80,"p99":120,"finishedAt":1760509948059}
+{"id":"2","status":"completed","total":101,"success":101,"errors":0,"avgLatencyMs":51,"p95":81,"p99":121,"finishedAt":1760509947059}
+{"id":"3","status":"completed","total":102,"success":102,"errors":0,"avgLatencyMs":52,"p95":82,"p99":122,"finishedAt":1760509946059}
+{"id":"4","status":"completed","total":103,"success":103,"errors":0,"avgLatencyMs":53,"p95":83,"p99":123,"finishedAt":1760509945059}
+{"id":"5","status":"completed","total":104,"success":104,"errors":0,"avgLatencyMs":54,"p95":84,"p99":124,"finishedAt":1760509944059}
+{"id":"1","status":"queued","requested":{"target":"http://localhost:3001/delay?ms=200","vus":5,"durationSeconds":15,"engine":"jmeter"},"createdAt":1760511231465}
+{"id":"1","status":"starting","requested":{"target":"http://localhost:3001/delay?ms=200","vus":5,"durationSeconds":15,"engine":"jmeter"},"createdAt":1760511231465,"startedAt":1760511231466}

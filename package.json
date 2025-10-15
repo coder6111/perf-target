@@ -1,0 +1,11 @@
+{
+  "name": "perf-target",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "npm run check:jmeter && node server.js",
+    "start:force": "node server.js",
+  "check:jmeter": "node scripts/check_jmeter.js",
+  "install:jmeter": "bash scripts/install_jmeter.sh"
+  }
+}
