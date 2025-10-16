@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Perf Test History Visualization</title>
+  <style>
+    body{font-family:Inter,system-ui,Arial;margin:18px;background:#0f1720;color:#e6eef6}
+    .wrap{max-width:1000px;margin:0 auto}
+    .card{background:rgba(255,255,255,0.03);padding:16px;border-radius:8px;margin-bottom:12px}
+    canvas{background:#071226;border-radius:6px;padding:6px}
+    .muted{color:#94a3b8;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Perf Test History — Visualization</h1>
+    <p class="muted">This page reads the control API history (control port = page port + 1) and shows simple charts for recent runs.</p>
+
+    <div class="card">
+      <h3>Latency (avg) over recent runs</h3>
+      <canvas id="latencyChart" height="120"></canvas>
+    </div>
+
+    <div class="card">
+      <h3>Requests & Errors</h3>
+      <canvas id="countsChart" height="120"></canvas>
+    </div>
+
+    <div class="card">
+      <h3>Raw history (latest)</h3>
+      <pre id="raw" style="max-height:200px;overflow:auto;background:#00121a;padding:10px;border-radius:6px;color:#cfe8ff"></pre>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+  <script>
+    const controlBase = (location.protocol + '//' + location.hostname + ':' + (location.port ? (parseInt(location.port,10)+1) : '3001'));
+    const rawEl = document.getElementById('raw');
+
+    async function fetchHistory(limit=50){
+      try{
+        const res = await fetch(controlBase + '/history?limit=' + encodeURIComponent(limit));
+        if(!res.ok) throw new Error('status ' + res.status);
+        return await res.json();
+      }catch(e){ console.error(e); return []; }
+    }
+
+    function makeCharts(items){
+      const labels = items.map(it => '#' + it.id + (it.finishedAt ? ' ' + new Date(it.finishedAt).toLocaleTimeString() : ''));
+      const avgs = items.map(it => it.avgLatencyMs || 0);
+      const totals = items.map(it => it.total || 0);
+      const errs = items.map(it => it.errors || 0);
+
+      // latency chart
+      const ctx = document.getElementById('latencyChart').getContext('2d');
+      new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: 'avg latency (ms)', data: avgs, borderColor: '#06b6d4', backgroundColor: 'rgba(6,182,212,0.12)', tension:0.3 }] }, options: { scales:{ y:{ beginAtZero:true } } } });
+
+      // counts chart
+      const ctx2 = document.getElementById('countsChart').getContext('2d');
+      new Chart(ctx2, { type: 'bar', data:{ labels, datasets:[ { label:'total reqs', data:totals, backgroundColor:'#16a34a' }, { label:'errors', data:errs, backgroundColor:'#ef4444' } ] }, options:{ scales:{ y:{ beginAtZero:true } } } });
+    }
+
+    async function refresh(){
+      const items = await fetchHistory(50);
+      rawEl.textContent = JSON.stringify(items.slice().reverse(), null, 2);
+      if(items && items.length) makeCharts(items.slice().reverse());
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>
