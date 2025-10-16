@@ -56,11 +56,35 @@ PATH=$(python3 -c "from urllib.parse import urlparse; u=urlparse('$TARGET'); pri
 echo "Running JMeter test against $TARGET"
 
 "$JMETER_CMD" -n -t "$TEMPLATE" -l "$RESULTS_FILE" -j "$LOG_FILE" \
-  -Jprotocol=$SCHEME -Jhost=$HOST -Jport=$PORT -Jpath="$PATH" -Jthreads=$VUS -Jduration=$DURATION -Jjmeter.save.saveservice.output_format=csv
+  -Jprotocol=$SCHEME -Jhost=$HOST -Jport=$PORT -Jpath="$PATH" -Jthreads=$VUS -Jduration=$DURATION -Jjmeter.save.saveservice.output_format=csv || {
+  echo "Wrapper jmeter failed; will try running JMeter jar directly as fallback..." >&2
+  # try direct jar execution
+  # locate jar
+  if [ -z "${JAR_PATH:-}" ]; then
+    # common location
+    JAR_PATH="$(dirname "$JMETER_CMD")/ApacheJMeter.jar"
+    if [ ! -f "$JAR_PATH" ]; then
+      JAR_PATH="$(cd "$(dirname "$JMETER_CMD")/.." && pwd)/libexec/bin/ApacheJMeter.jar" || true
+    fi
+  fi
+  if [ -f "$JAR_PATH" ]; then
+    echo "Found JMeter jar at $JAR_PATH, running via java -cp";
+    java -cp "$JAR_PATH" org.apache.jmeter.NewDriver -n -t "$TEMPLATE" -l "$RESULTS_FILE" -j "$LOG_FILE" \
+      -Jprotocol=$SCHEME -Jhost=$HOST -Jport=$PORT -Jpath="$PATH" -Jthreads=$VUS -Jduration=$DURATION -Jjmeter.save.saveservice.output_format=csv || {
+      echo "Direct jar invocation failed. Check $LOG_FILE" >&2; exit 5;
+    }
+  else
+    echo "Unable to locate ApacheJMeter.jar for direct invocation." >&2; exit 6;
+  fi
+}
 
 if [ -f "$RESULTS_FILE" ]; then
   echo "Results written to $RESULTS_FILE"
   echo "Log: $LOG_FILE"
+  # attempt to parse results and append summary to tests_history.ndjson
+  if command -v node >/dev/null 2>&1 && [ -f "$(pwd)/scripts/parse_jmeter_results.js" ]; then
+    node scripts/parse_jmeter_results.js "$RESULTS_FILE" || echo "Result parsing failed" >&2
+  fi
   echo "Done."
 else
   echo "JMeter did not produce results file. Check $LOG_FILE" >&2
