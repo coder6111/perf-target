@@ -65,6 +65,37 @@ Additional notes:
 Port conflicts and "Upgrade Required":
 - If you receive an HTTP 426 "Upgrade Required" when calling the control API, another local tool (for example VS Code Live Preview) may be listening on that port. Check with `lsof -iTCP:<port> -sTCP:LISTEN` to find the process, or start the server with a different `PORT` environment variable.
 
+Getting started (quick)
+-----------------------
+
+1. Start the safe local target (serves sample endpoints):
+
+```bash
+cd perf_test
+node server.js
+# open http://localhost:4000/
+```
+
+2. Start the main runner (content UI + control API). Enable demo mode for an in-process runner:
+
+```bash
+cd .. # repo root
+ALLOW_DEMO=true npm run start:force
+# content UI -> http://localhost:3000/  control API -> http://localhost:3001/
+```
+
+3. Run a quick demo test (via UI or curl):
+
+```bash
+curl -s -X POST "http://localhost:3001/run-test" -H "Content-Type: application/json" \
+  -d '{"url":"http://localhost:4000/api/delay?ms=50","vus":5,"durationSeconds":10,"engine":"demo"}' | jq
+```
+
+4. View history and visualization:
+
+- History JSON: http://localhost:3001/history
+- Visualization: http://localhost:3000/visualize.html
+
 
 JMeter support
 -------------
