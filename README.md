@@ -65,3 +65,30 @@ Additional notes:
 Port conflicts and "Upgrade Required":
 - If you receive an HTTP 426 "Upgrade Required" when calling the control API, another local tool (for example VS Code Live Preview) may be listening on that port. Check with `lsof -iTCP:<port> -sTCP:LISTEN` to find the process, or start the server with a different `PORT` environment variable.
 
+
+JMeter support
+-------------
+
+This repo includes a JMeter test template `jmeter_template.jmx` and helper scripts in `scripts/`:
+
+- `scripts/check_jmeter.js` — checks whether `jmeter` is on PATH.
+- `scripts/install_jmeter.sh` — macOS Homebrew helper to install JMeter.
+- `scripts/run_jmeter.sh` — wrapper to run the included JMX against a specified target.
+
+Quick example (macOS):
+
+```bash
+# install jmeter (Homebrew)
+npm run install:jmeter
+
+# start the local perf target (content server)
+npm run start:force &
+
+# run the included JMeter template against the local perf_test target
+TARGET=http://localhost:4000/api/delay?ms=50 VUS=10 DURATION=15 npm run jmeter:run
+```
+
+Notes:
+- The JMX template expects the host/path to be supplied via `-Jhost`, `-Jpath`, etc. `scripts/run_jmeter.sh` sets those based on the `TARGET` env var.
+- Running JMeter may create result artifacts in `/tmp` — check the printed results path after a run.
+
