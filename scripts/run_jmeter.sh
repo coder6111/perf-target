@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure common system paths are present so JMeter's wrapper can find utilities like dirname/awk/uname
+export PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # Simple wrapper to run the included jmeter_template.jmx against a target
 # Usage: TARGET=http://localhost:4000/path VUS=10 DURATION=30 bash scripts/run_jmeter.sh
 
